@@ -1,7 +1,7 @@
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from embedding.vector_store import delete_document
+from embedding.vector_store import delete_document, get_document_stats
 from pipeline.pipeline import ingest, answer_query
 from telemetry import snapshot
 import os, shutil
@@ -24,6 +24,11 @@ def health():
 @app.get("/stats")
 def stats():
     return snapshot()
+
+
+@app.get("/document/{doc_name}/stats")
+def doc_stats_endpoint(doc_name: str):
+    return get_document_stats(doc_name)
 
 class QueryRequest(BaseModel):
     query: str
