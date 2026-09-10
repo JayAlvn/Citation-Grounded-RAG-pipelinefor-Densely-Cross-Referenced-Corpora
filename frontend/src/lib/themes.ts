@@ -7,35 +7,39 @@ export interface ThemeColors {
   border: string;
   accent: string;
   accentText: string;
+  fontWeight: number;
 }
 
 export const THEMES: { name: string; colors: ThemeColors }[] = [
   {
     name: 'Midnight Dark',
     colors: {
-      bg: '#0F0F11',
-      panelBg: '#18181A',
-      cardBg: '#27272A',
-      text: '#FAFAFA',
-      textMuted: '#A1A1AA',
-      border: '#3F3F46',
+      // Neutral near-black with no blue undertone; separation comes from hairline borders.
+      bg: '#0A0A0A',        // app background — the gutter between panels
+      panelBg: '#111111',   // panels
+      cardBg: '#1C1C1C',    // cards, chat bubbles, meter tracks — one visible step above panels
+      text: '#EDEDED',      // primary text — off-white, softer than pure white on black
+      textMuted: '#8C8C8C', // secondary text — neutral grey, still AA on cards
+      border: '#2A2A2A',    // hairline borders & bar tracks
       accent: '#3B82F6',
-      accentText: '#FFFFFF'
+      accentText: '#FFFFFF',
+      fontWeight: 400
     }
   },
   {
     name: 'Daylight',
     colors: {
-      // Surfaces step app -> card -> panel. The steps were previously ~1.1:1,
-      // so cards vanished into the panels and an unfilled bar read as nothing.
-      bg: '#D6DEEA',        // app background — deeper slate, so white panels read as raised
-      panelBg: '#FFFFFF',   // panels — crisp white
-      cardBg: '#E3EAF3',    // cards & chart tracks — a real step below the white panels
-      text: '#0B1220',      // primary text — near-black slate, maximum legibility
-      textMuted: '#43506B', // secondary text — slate, holds up on both panel and card
-      border: '#A9B6C9',    // borders & bar tracks — defined against white and card alike
-      accent: '#1D4ED8',    // blue-700 — deeper, higher-contrast accent on white
-      accentText: '#FFFFFF'
+      // Monochrome editorial palette: off-white ground, warm charcoal ink.
+      // Border stays lighter than the accent so bar tracks remain visible under a filled bar.
+      bg: '#E4E4E1',        // app background — a step below the panels, for the gutters
+      panelBg: '#F2F2F2',   // panels — off-white ground
+      cardBg: '#E9E9E6',    // cards & chart tracks — warm grey, one step below the panels
+      text: '#2C2C29',      // primary text — warm charcoal
+      textMuted: '#5E5E59', // secondary text — warm mid grey
+      border: '#BDBDB7',    // borders & bar tracks — soft warm grey
+      accent: '#2C2C29',    // charcoal — filled buttons and active states, as on the reference
+      accentText: '#FFFFFF',
+      fontWeight: 500       // medium — charcoal on off-white reads thin at regular weight
     }
   }
 ];

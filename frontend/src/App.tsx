@@ -1,8 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Group, Panel, Separator, type PanelImperativeHandle } from 'react-resizable-panels';
 import { THEMES, ThemeColors } from './lib/themes';
-import type { RetrievalItem, Message, Turn, Risk, Confidence, Usage } from './lib/utils';
-import { useMachineStats, type Timings } from './lib/useMachineStats';
+import type { RetrievalItem, Message, Turn, Risk, Confidence, Usage, DocStats } from './lib/utils';
+import { useMachineStats } from './lib/useMachineStats';
 import { MessageSquareIcon } from './components/Icons';
 import { FindingPane } from './components/FindingPane';
 import { CitationPane } from './components/CitationPane';
@@ -10,7 +10,7 @@ import { ChatPane } from './components/ChatPane';
 import { ContextPane } from './components/ContextPane';
 import './App.css';
 
-type Doc = { id: string; name: string; chunks: number };
+type Doc = { id: string; name: string; chunks: number; stats?: DocStats };
 
 const EMPTY_USAGE: Usage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, context_window: 4096 };
 
@@ -36,10 +36,7 @@ function App() {
   // Message identity has to survive list growth, so it can't be the array index.
   const nextId = useRef(0);
 
-  // A query takes several seconds, so show the clock running rather than a dead label.
-  const [elapsedMs, setElapsedMs] = useState(0);
   const [lastMs, setLastMs] = useState<number | null>(null);
-  const [timings, setTimings] = useState<Timings | null>(null);
 
   // Polls fast while generating, slowly when idle.
   const machine = useMachineStats(loading);
@@ -55,14 +52,6 @@ function App() {
   // Real token usage from Ollama:
   const [usage, setUsage] = useState<Usage>(EMPTY_USAGE);
   const [tokensBurned, setTokensBurned] = useState(0);
-
-  useEffect(() => {
-    if (!loading) return;
-    const started = performance.now();
-    setElapsedMs(0);
-    const id = setInterval(() => setElapsedMs(performance.now() - started), 100);
-    return () => clearInterval(id);
-  }, [loading]);
 
   const toggleChat = () => {
     const panel = chatPanel.current;
@@ -102,7 +91,6 @@ function App() {
     setRisk(t.risk);
     setConfidence(t.confidence);
     setUsage(t.usage);
-    setTimings(t.timings);
     setLastMs(t.ms);
     setError(null);
     setActiveTurnId(message.id);
@@ -148,7 +136,6 @@ function App() {
       setRetrieval(turn.retrieval);
       setRisk(turn.risk);
       setConfidence(turn.confidence);
-      setTimings(turn.timings);
       setUsage(turn.usage);
       setTokensBurned(t => t + (turn.usage.total_tokens ?? 0));
 
@@ -164,7 +151,6 @@ function App() {
       setRisk({ level: '', score: 0, factors: [] });
       setConfidence({ level: '', score: 0 });
       setUsage(EMPTY_USAGE);
-      setTimings(null);
       // No turn attached: a failed query has no evidence to restore, which is
       // what keeps the error bubble unclickable.
       setMessages(prev => [...prev, { id: ++nextId.current, role: 'assistant', content: `Error: ${msg}` }]);
@@ -176,9 +162,10 @@ function App() {
 
   return (
     <div
-      className="relative h-screen w-screen overflow-hidden transition-colors duration-200"
+      className="relative h-screen w-screen overflow-hidden p-1.5 transition-colors duration-200"
       style={{
         backgroundColor: 'var(--app-bg)',
+        fontWeight: theme.fontWeight,
         '--app-bg': theme.bg,
         '--panel-bg': theme.panelBg,
         '--card-bg': theme.cardBg,
@@ -193,7 +180,12 @@ function App() {
       <div className="absolute top-1.5 right-4 z-50">
         <div
           className="flex items-center gap-1 p-1 rounded-lg border shadow-sm backdrop-blur-md"
-          style={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)' }}
+          // Translucent so backdrop-blur has something to act on: the toolbar is
+          // the one element that floats over pane content.
+          style={{
+            backgroundColor: 'color-mix(in srgb, var(--card-bg) 60%, transparent)',
+            borderColor: 'var(--border-color)',
+          }}
         >
           <button
             onClick={toggleChat}
@@ -247,14 +239,12 @@ function App() {
                 const panel = findingPanel.current;
                 if (panel) setFindingCollapsed(panel.isCollapsed());
               }}
-              className="overflow-hidden"
-              style={{ borderBottom: '1px solid var(--border-color)' }}
+              className="overflow-hidden rounded-lg border"
             >
               <FindingPane
                 finding={finding}
                 error={error}
                 loading={loading}
-                elapsedMs={elapsedMs}
                 mode={mode}
                 risk={risk}
                 confidence={confidence}
@@ -266,7 +256,7 @@ function App() {
 
             <Separator className="panel-separator panel-separator-vertical" />
 
-            <Panel id="citations" defaultSize={55} minSize={15} className="overflow-hidden">
+            <Panel id="citations" defaultSize={55} minSize={15} className="overflow-hidden rounded-lg border">
               <CitationPane citations={citations} retrieval={retrieval} />
             </Panel>
           </Group>
@@ -286,10 +276,9 @@ function App() {
           // Dragging past minSize collapses the panel too, so track the real
           // size rather than assuming the toolbar button is the only way in.
           onResize={(size) => setChatVisible(size.asPercentage > 0)}
+          // No border here: ChatPane is two bordered panes of its own, and at
+          // collapsedSize 0 the panel's overflow clipping hides both.
           className="min-w-0"
-          style={chatVisible
-            ? { borderLeft: '1px solid var(--border-color)', borderRight: '1px solid var(--border-color)' }
-            : undefined}
         >
           <ChatPane
             messages={messages}
@@ -309,7 +298,7 @@ function App() {
         <Separator className="panel-separator" />
 
         {/* Right: Files + Context Window */}
-        <Panel id="files" defaultSize={25} minSize={15} className="min-w-0">
+        <Panel id="files" defaultSize={25} minSize={15} className="min-w-0 rounded-lg border">
           <ContextPane
             documents={documents}
             setDocuments={setDocuments}
@@ -319,7 +308,6 @@ function App() {
             tokensBurned={tokensBurned}
             lastMs={lastMs}
             machine={machine}
-            timings={timings}
           />
         </Panel>
 

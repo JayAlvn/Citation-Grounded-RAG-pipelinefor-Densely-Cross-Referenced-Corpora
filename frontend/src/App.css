@@ -35,34 +35,110 @@
   }
 }
 
-/* Subtle separator adjustments fitting active background color variables */
+/* Separators are the gutters between the rounded panes: a transparent strip the
+   app background shows through. On hover or keyboard focus a thin accent line
+   appears in the middle, so the gutter keeps its size and nothing shifts. */
 .panel-separator {
   flex-shrink: 0;
-  width: 1px;
-  background-color: var(--border-color);
+  position: relative;
+  width: 6px;
+  background-color: transparent;
   cursor: col-resize;
-  transition: background-color 0.15s ease, width 0.15s ease, height 0.15s ease;
 }
 
-.panel-separator:hover {
-  width: 4px;
+.panel-separator::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  border-radius: 1px;
+  background-color: transparent;
+  transition: background-color 0.15s ease;
+}
+
+.panel-separator:hover::after,
+.panel-separator:focus-visible::after {
   background-color: var(--accent-color);
 }
 
-/* In a vertical group the divider runs horizontally, so the 1px belongs to
-   height instead of width -- without this it inherits width:1px and collapses
-   to nothing, leaving a handle that renders but cannot be grabbed. */
+/* In a vertical group the gutter runs horizontally, so its size belongs to
+   height instead of width -- without this it inherits width: 6px and the
+   handle cannot be grabbed across the pane. */
 .panel-separator-vertical {
   width: 100%;
-  height: 1px;
+  height: 6px;
   cursor: row-resize;
 }
 
-.panel-separator-vertical:hover {
-  width: 100%;
-  height: 4px;
+.panel-separator-vertical::after {
+  top: 50%;
+  bottom: auto;
+  left: 0;
+  right: 0;
+  width: auto;
+  height: 2px;
+  transform: translateY(-50%);
 }
 
 [data-panel] {
   overflow: hidden;
+}
+
+/* Query in flight. The backend answers in one response, so the UI can't know
+   how far along a query is. The bar trickles toward 90% and only runs to the
+   end when the answer arrives -- reaching the end is the one moment its
+   position is real. It runs along the top edge of the composer pane, clipped
+   by the pane's rounded corners. The phase classes are set by QueryProgress.tsx. */
+.query-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.query-progress-bar {
+  height: 100%;
+  width: 100%;
+  background-color: var(--accent-color);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+/* Heads for 90% and never quite arrives: most of the distance goes in the
+   first few seconds, then the ease-out makes the rest crawl, so a slow query
+   still shows movement. 30s is the pace -- raise it if queries run longer. */
+.query-progress--running .query-progress-bar {
+  transform: scaleX(0.9);
+  transition: transform 30s cubic-bezier(0.08, 0.6, 0.2, 1);
+}
+
+/* The answer is in: run the rest of the way, then fade. A transition that
+   interrupts another starts from wherever the bar is, so there is no jump. */
+.query-progress--done .query-progress-bar {
+  transform: scaleX(1);
+  opacity: 0;
+  transition: transform 0.25s ease-out, opacity 0.2s ease-out 0.25s;
+}
+
+/* Back to empty without animating the reset. */
+.query-progress--idle .query-progress-bar {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .query-progress--running .query-progress-bar {
+    transform: scaleX(1);
+    opacity: 0.6;
+    transition: none;
+  }
+
+  .query-progress--done .query-progress-bar {
+    transition: none;
+  }
 }

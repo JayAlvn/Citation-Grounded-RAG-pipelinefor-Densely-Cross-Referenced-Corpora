@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { Group, Panel, Separator } from 'react-resizable-panels';
 import type { Message } from '../lib/utils';
+import { QueryProgress } from './QueryProgress';
 
 type ChatPaneProps = {
   messages: Message[];
@@ -19,6 +21,10 @@ type ChatPaneProps = {
 };
 
 const SOURCE_CHOICES = [2, 3, 4, 6, 8, 10, 12];
+
+/* Fits the scope-and-controls row, a three-line textarea, the model warning
+   and the Send button. */
+const COMPOSER_HEIGHT = '232px';
 
 function riskColor(level: string): string {
   if (level === 'high') return '#ef4444';
@@ -114,109 +120,120 @@ export function ChatPane({
   );
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col" style={{ backgroundColor: 'var(--panel-bg)', color: 'var(--text-main)' }}>
+    <Group orientation="vertical" className="h-full w-full">
       {/* Messages */}
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden p-4">
-        {messages.length === 0 ? (
-          <div className="flex h-full items-center justify-center text-sm" style={{ color: 'var(--text-muted)' }}>
-            Ask something to begin.
-          </div>
-        ) : (
-          messages.map((msg) => (
-            <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              {msg.turn ? answeredTurn(msg) : plainBubble(msg)}
-            </div>
-          ))
-        )}
-        {loading && (
-          <div className="flex justify-start">
-            <span className="inline-block rounded-2xl px-3.5 py-2 text-sm" style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
-              Generating…
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Input */}
-      <div className="shrink-0 p-4" style={{ borderTop: '1px solid var(--border-color)' }}>
-        {/* Scope is the easiest thing to get wrong, so it sits next to the input. */}
-        <div className="mb-2 flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-          <span>Asking about</span>
-          <span
-            className="rounded-full px-2 py-0.5 font-medium max-w-[60%] truncate"
-            style={{
-              backgroundColor: 'var(--card-bg)',
-              border: '1px solid var(--border-color)',
-              color: activeDoc ? 'var(--accent-color)' : 'var(--text-muted)',
-            }}
-            title={activeDoc ?? 'Every indexed document'}
-          >
-            {activeDoc ?? 'all documents'}
-          </span>
-        </div>
-
-        {/* Query controls sit with the scope, above the box they apply to. */}
+      <Panel id="transcript" minSize={20} className="overflow-hidden rounded-lg border">
         <div
-          className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-2 text-[11px]"
-          style={{ color: 'var(--text-muted)' }}
+          className="h-full space-y-3 overflow-y-auto overflow-x-hidden p-4"
+          style={{ backgroundColor: 'var(--panel-bg)', color: 'var(--text-main)' }}
         >
-          <span>RAG mode:</span>
-          {modeButton('basic')}
-          {modeButton('naive')}
+          {messages.length === 0 ? (
+            <div className="flex h-full items-center justify-center text-sm" style={{ color: 'var(--text-muted)' }}>
+              Ask something to begin.
+            </div>
+          ) : (
+            messages.map((msg) => (
+              <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                {msg.turn ? answeredTurn(msg) : plainBubble(msg)}
+              </div>
+            ))
+          )}
+          {loading && (
+            <div className="flex justify-start">
+              <span className="inline-block rounded-2xl px-3.5 py-2 text-sm" style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                Generating…
+              </span>
+            </div>
+          )}
+        </div>
+      </Panel>
 
-          <label className="ml-auto flex items-center gap-1.5">
-            <span>Sources</span>
-            <select
-              value={sourceCount}
-              onChange={(e) => setSourceCount(Number(e.target.value))}
-              className="rounded-full px-2 py-1 text-xs font-medium outline-none cursor-pointer"
+      <Separator className="panel-separator panel-separator-vertical" />
+
+      {/* Input. Its default height is also its floor: drag the divider up for
+          a long prompt (the textarea takes the extra room), back down to reset. */}
+      <Panel id="composer" defaultSize={COMPOSER_HEIGHT} minSize={COMPOSER_HEIGHT} className="overflow-hidden rounded-lg border">
+        <div
+          className="relative flex h-full flex-col overflow-y-auto p-4"
+          style={{ backgroundColor: 'var(--panel-bg)', color: 'var(--text-main)' }}
+        >
+          <QueryProgress loading={loading} />
+          {/* Scope and query controls share one row above the box they apply
+              to. Scope is the easiest thing to get wrong, so it comes first. */}
+          <div
+            className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-2 text-[11px]"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            <span>Asking about</span>
+            <span
+              className="max-w-[10rem] truncate rounded-full px-2 py-0.5 font-medium"
               style={{
                 backgroundColor: 'var(--card-bg)',
                 border: '1px solid var(--border-color)',
-                color: 'var(--text-main)',
+                color: activeDoc ? 'var(--accent-color)' : 'var(--text-muted)',
               }}
-              title="How many passages to retrieve and cite"
+              title={activeDoc ?? 'Every indexed document'}
             >
-              {SOURCE_CHOICES.map(n => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </select>
-          </label>
-        </div>
+              {activeDoc ?? 'all documents'}
+            </span>
 
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              submit();
-            }
-          }}
-          placeholder="Paste your prompt…  (Enter to send, Shift+Enter for newline)"
-          rows={3}
-          className="w-full resize-none rounded-xl p-3 text-sm outline-none"
-          style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)' }}
-        />
-        {/* Set the expectation before the wait, not after it. */}
-        {modelLoaded === false && mode === 'basic' && (
-          <p className="mt-2 text-[11px]" style={{ color: '#f59e0b' }}>
-            Model not loaded — the first query spends ~10s reloading it.
-          </p>
-        )}
+            <span className="ml-1">RAG mode:</span>
+            {modeButton('basic')}
+            {modeButton('naive')}
 
-        <div className="mt-2 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={submit}
-            disabled={loading}
-            className="ml-auto rounded-full px-5 py-2 text-sm font-medium transition-colors disabled:opacity-50"
-            style={{ backgroundColor: 'var(--accent-color)', color: 'var(--accent-text)' }}
-          >
-            {loading ? '…' : 'Send'}
-          </button>
+            <label className="ml-auto flex items-center gap-1.5">
+              <span>Sources</span>
+              <select
+                value={sourceCount}
+                onChange={(e) => setSourceCount(Number(e.target.value))}
+                className="rounded-full px-2 py-1 text-xs font-medium outline-none cursor-pointer"
+                style={{
+                  backgroundColor: 'var(--card-bg)',
+                  border: '1px solid var(--border-color)',
+                  color: 'var(--text-main)',
+                }}
+                title="How many passages to retrieve and cite"
+              >
+                {SOURCE_CHOICES.map(n => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                submit();
+              }
+            }}
+            placeholder="Paste your prompt…  (Enter to send, Shift+Enter for newline)"
+            className="min-h-[4.5rem] w-full flex-1 resize-none rounded-xl p-3 text-sm outline-none"
+            style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)' }}
+          />
+          {/* Set the expectation before the wait, not after it. */}
+          {modelLoaded === false && mode === 'basic' && (
+            <p className="mt-2 text-[11px]" style={{ color: '#f59e0b' }}>
+              Model not loaded — the first query spends ~10s reloading it.
+            </p>
+          )}
+
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={submit}
+              disabled={loading}
+              className="ml-auto rounded-full px-5 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+              style={{ backgroundColor: 'var(--accent-color)', color: 'var(--accent-text)' }}
+            >
+              {loading ? '…' : 'Send'}
+            </button>
+          </div>
         </div>
-      </div>
-    </div>
+      </Panel>
+    </Group>
   );
 }

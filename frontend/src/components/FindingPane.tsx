@@ -9,7 +9,6 @@ type FindingPaneProps = {
   finding: string;
   error: string | null;
   loading: boolean;
-  elapsedMs: number;
   mode: 'naive' | 'basic';
   risk: Risk;
   confidence: Confidence;
@@ -25,7 +24,7 @@ function levelColor(level: string): string {
 }
 
 export function FindingPane({
-  finding, error, loading, elapsedMs, mode, risk, confidence, accent,
+  finding, error, loading, mode, risk, confidence, accent,
   collapsed, onToggleCollapse,
 }: FindingPaneProps) {
   // Risk is produced by the LLM, so only basic mode has it. Confidence comes from
@@ -63,7 +62,6 @@ export function FindingPane({
           {loading ? (
             <div className="flex items-baseline gap-2 text-sm" style={{ color: 'var(--text-muted)' }}>
               <span className="animate-pulse">Searching…</span>
-              <span className="text-xs tabular-nums">{(elapsedMs / 1000).toFixed(1)}s</span>
             </div>
           ) : error ? (
             <div
