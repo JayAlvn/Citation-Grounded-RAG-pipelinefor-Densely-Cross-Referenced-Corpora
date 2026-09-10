@@ -1,10 +1,11 @@
 import React, { useState, useRef } from 'react';
 import { FileIcon, XIcon, UploadIcon } from './Icons';
 import { MachinePane } from './MachinePane';
-import type { MachineStats, Timings } from '../lib/useMachineStats';
-import type { Usage } from '../lib/utils';
+import type { MachineStats } from '../lib/useMachineStats';
+import type { Usage, DocStats } from '../lib/utils';
+import { fetchDocStats, structuralSummary } from '../lib/utils';
 
-type Doc = { id: string; name: string; chunks: number };
+type Doc = { id: string; name: string; chunks: number; stats?: DocStats };
 
 type ContextPaneProps = {
   documents: Doc[];
@@ -15,7 +16,6 @@ type ContextPaneProps = {
   tokensBurned: number;
   lastMs: number | null;
   machine: MachineStats | null;
-  timings: Timings | null;
 };
 
 export function ContextPane({
@@ -27,7 +27,6 @@ export function ContextPane({
   tokensBurned,
   lastMs,
   machine,
-  timings,
 }: ContextPaneProps) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -48,6 +47,18 @@ export function ContextPane({
         { id: data.filename, name: data.filename, chunks: data.chunks_indexed },
       ]);
       setActiveDoc(data.filename); // auto-scope queries to the doc you just added
+
+      // Structural stats are read back from the index rather than returned by
+      // /upload, so the same call also serves documents indexed earlier.
+      const stats = await fetchDocStats(data.filename);
+      if (stats) {
+        setDocuments(prev =>
+          prev.map(d => {
+            if (d.name !== data.filename) return d;
+            return { ...d, stats };
+          }),
+        );
+      }
     } catch {
       setUploadError('Upload failed — is the backend running on localhost:8000?');
     } finally {
@@ -153,7 +164,7 @@ export function ContextPane({
 
       {machine && (
         <>
-          <MachinePane machine={machine} timings={timings} />
+          <MachinePane machine={machine} />
           <hr style={{ borderColor: 'var(--border-color)' }} className="my-5" />
         </>
       )}
@@ -189,6 +200,11 @@ export function ContextPane({
                     <p className="text-xs mt-0.5" style={{ color: isActive ? 'var(--accent-color)' : 'var(--text-muted)' }}>
                       {doc.chunks} chunks indexed{isActive ? ' · active' : ''}
                     </p>
+                    {doc.stats && structuralSummary(doc.stats) && (
+                      <p className="text-xs mt-0.5 tabular-nums" style={{ color: 'var(--text-muted)' }}>
+                        {structuralSummary(doc.stats)}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <button

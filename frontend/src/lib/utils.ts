@@ -70,6 +70,52 @@ export type Message = {
   turn?: Turn;
 };
 
+/* ── Document structure ──────────────────────────────────────────────────── */
+
+/** What GET /document/{name}/stats returns. Every key beyond `chunks` is
+ *  optional: the backend omits a key entirely when the document has none of
+ *  that unit, so a .txt file carries no `articles` and a cover page no
+ *  `chapters`. Render what arrives rather than defaulting absent keys to 0. */
+export type DocStats = {
+  chunks: number;
+  pages?: number;
+  articles?: number;
+  recitals?: number;
+  chapters?: number;
+};
+
+/** The structural units of a document, as one line: "144 pages · 113 articles".
+ *  Chunks are omitted -- they are an implementation detail already shown above,
+ *  not a property of the source document. */
+export function structuralSummary(stats: DocStats): string {
+  const parts: string[] = [];
+
+  if (stats.pages) parts.push(`${stats.pages} pages`);
+  if (stats.chapters) parts.push(`${stats.chapters} chapters`);
+  if (stats.articles) parts.push(`${stats.articles} articles`);
+  if (stats.recitals) parts.push(`${stats.recitals} recitals`);
+
+  return parts.join(' · ');
+}
+
+/** Structural stats for one indexed document. Returns null when the document
+ *  is unknown to the backend or the call fails -- the caller renders nothing. */
+export async function fetchDocStats(name: string): Promise<DocStats | null> {
+  try {
+    const res = await fetch(
+      `http://localhost:8000/document/${encodeURIComponent(name)}/stats`,
+    );
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    if (!data || typeof data.chunks !== 'number') return null;
+
+    return data as DocStats;
+  } catch {
+    return null;
+  }
+}
+
 /** Strip Private Use Area characters (U+E000–U+F8FF).
  *
  *  PDFs that draw bullets with Symbol or Wingdings map those glyphs into the
