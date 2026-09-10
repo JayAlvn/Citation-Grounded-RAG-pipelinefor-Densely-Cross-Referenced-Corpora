@@ -32,18 +32,30 @@ class BasicBackend(Base):
 
         prompt = (
             "You are a fraud-detection assistant analyzing a document.\n"
-            "Perform TWO separate tasks using ONLY the context below:\n"
-            "1. SUMMARY: Answer the user's question. If the question is unrelated "
+
+            "Perform THREE separate tasks using ONLY the context below:\n"
+
+            "1. ANSWER: Answer the user's question DIRECTLY in a brief format. If the question is unrelated "
             "to fraud, just answer it plainly.\n"
-            "2. RISK SCAN: INDEPENDENTLY of the question, scan the context for fraud "
+
+            "2. DETAIL: Say where in the document the answer comes from and what "
+            "the surrounding text adds. If the document only names something "
+            "without describing it, say so plainly instead of repeating the name.\n"
+
+            "3. RISK SCAN: INDEPENDENTLY of the question, scan the context for fraud "
             "indicators — artificial urgency/pressure, changed or offshore bank "
             "details, missing/verbal-only approvals, amounts just under approval "
             "thresholds, duplicate invoices, missing deliverables, unverified or "
             "newly-added vendors, requests not to verify. Always perform this scan "
             "even if the question is not about fraud.\n"
+
             "Respond with a JSON object EXACTLY in this shape:\n"
+
             "{\n"
+            '  "answer": "<direct answer to the question, plain text>",\n'
+            '  "detail": "<where in the document it comes from and what it adds>",\n'
             '  "summary": "<answer to the user question, plain text>",\n'
+    
             '  "risk_level": "<one of: low, medium, high>",\n'
             '  "risk_score": <integer 0-100>,\n'
             '  "factors": [\n'
@@ -67,13 +79,17 @@ class BasicBackend(Base):
 
         try:
             data = json.loads(raw)
-            finding = data.get("summary", raw)
+            finding = data.get("answer")
+            if finding is None:
+                finding = data.get("summary", raw)
+            detail = data.get("detail", "")
             risk_level = data.get("risk_level", "unknown")
             risk_score = int(data.get("risk_score", 0))
             factors = data.get("factors", [])
 
         except (json.JSONDecodeError, ValueError, TypeError):
             finding = raw
+            detail = ""
             risk_level = "unknown"
             risk_score = 0
             factors = []
@@ -82,12 +98,10 @@ class BasicBackend(Base):
         completion_tokens = _grab(response, "eval_count")
 
 
-
-        
-
         return {
             "finding": finding,
             "sources": chunks,
+            "detail": detail,
             "risk_level": risk_level,
             "risk_score": risk_score,
             "factors": factors,
