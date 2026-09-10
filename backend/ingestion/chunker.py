@@ -2,11 +2,12 @@ from bisect import bisect_right
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from ingestion.cleaner import clean_text
-from ingestion.structure import find_markers
+from ingestion.structure import find_markers, _CONTAINERS
 
 CHUNK_SIZE = 500   # max no of chars per chunk
 CHUNK_OVERLAP = 50  # repeating the last 50 tokens of each chunk at the start of the next one
 _MIN_MARKERS = 3
+
 
 _splitter = RecursiveCharacterTextSplitter(
     chunk_size=CHUNK_SIZE,
@@ -59,7 +60,7 @@ def chunk_document(pages: list[tuple[int, str]]) -> list[dict]:
         return _emit(text, 0, page_of, {})
 
     chunks = []
-    chapter = None
+    container = None
     # Text ahead of the first marker (cover, table of contents) is still content.
     if text[:markers[0][0]].strip():
         chunks += _emit(text[:markers[0][0]], 0, page_of, {})
@@ -67,15 +68,12 @@ def chunk_document(pages: list[tuple[int, str]]) -> list[dict]:
     for i, (start, kind, value) in enumerate(markers):
         end = markers[i + 1][0] if i + 1 < len(markers) else len(text)
 
-        if kind == "chapter":
-            chapter = value
-            labels = {"chapter": value}
-        elif kind == "article":
-            labels = {"article": value}
-            if chapter:
-                labels["chapter"] = chapter
-        else:  # recital -- these precede the enacting part, so no chapter applies
-            labels = {"recital": value}
+        labels = {kind: value}
+
+        if kind in _CONTAINERS:
+            container = (kind, value)
+        elif container:
+            labels[container[0]] = container[1]
 
         chunks += _emit(text[start:end], start, page_of, labels)
 

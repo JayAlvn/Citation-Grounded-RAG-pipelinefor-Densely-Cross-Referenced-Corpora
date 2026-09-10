@@ -9,27 +9,8 @@ collection = client.get_or_create_collection(
     metadata={"hnsw:space": "cosine"},
 )
 
-# Location keys a chunk may carry; absent ones are left out entirely,
-# since Chroma rejects None metadata values.
-_LOCATION_KEYS = ("page", "recital", "article", "chapter")
-
-
-def _chunk_text(chunk: str | dict) -> str:
-    if isinstance(chunk, dict):
-        return chunk["text"]
-    
-    return chunk
-
-def _chunk_metadata(chunk: str | dict, doc_name: str) -> dict:
-    
-    meta = {"source:": doc_name}
-
-    if isinstance(chunk, dict):
-        for key in _LOCATION_KEYS:
-            if key in chunk:
-                meta[key] = chunk[key]
-
-    return meta
+# Units whose plural isn't just +s. "annexs" would reach the UI otherwise.
+_PLURALS = {"annex": "annexes", "appendix": "appendices"}
 
 def _prepare_chunks(chunks: list[str] | list[dict], doc_name: str) -> tuple[list[str], list[dict]]:
 
@@ -40,8 +21,8 @@ def _prepare_chunks(chunks: list[str] | list[dict], doc_name: str) -> tuple[list
         meta = {"source": doc_name}
         if isinstance(chunk, dict):
             texts.append(chunk["text"])
-            for key in _LOCATION_KEYS:
-                if key in chunk:
+            for key in chunk:
+                if key != "text":
                     meta[key] = chunk[key]
 
         else:
@@ -134,10 +115,17 @@ def get_document_stats(doc_name: str) -> dict:
     if pages:
         stats["pages"] = max(pages)
 
-    for key in ("article", "recital", "chapter"):
+    keys = set()
+    for meta in metas:
+        keys.update(meta)
+    keys.discard("source")
+    keys.discard("page")
+
+    for key in sorted(keys):
         values = _values_for(metas, key)
-        if values:
-            stats[key + "s"] = len(set(values))
+        plural = _PLURALS.get(key, key + "s")
+        stats[plural] =len(set(values))
+
 
     return stats
 

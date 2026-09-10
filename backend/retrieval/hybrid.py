@@ -42,32 +42,42 @@ def hybrid_search(query_text: str, source: str | None = None, n: int = 6):
     return chunks, distances, metas
 
 
-# Words users reach for when naming a numbered part of a document, mapped to the
-# metadata the chunker records. Ordered by how specific the answer is, 
-_IDENTIFIER_FIELDS = (
-    ("recital", ("clause", "recital")),
-    ("article", ("article", "section")),
-    ("page", ("page",)),
-)
+_UNIT_WORDS = ("recital", "clause", "article", "section", "annex",
+               "schedule", "rule", "chapter", "part", "page")
 
 _IDENTIFIER = re.compile(
-    r"\b(clause|recital|article|section|page)s?\.?\s*(?:no\.?\s*|number\s*)?(\d{1,4})\b",
+    r"\b(" + "|".join(_UNIT_WORDS) + r")s?\.?\s*(?:no\.?\s*|number\s*)?(\d{1,4})\b",
     re.I,
 )
 
+# A query word is tried as its own metadata key first. These add a second
+# try for conventions where people name a unit by another word -- in EU
+# regulation, "clause 148" means recital 148.
+_FALLBACKS = {
+    "clause": ("recital",),
+    "section": ("article",),
+}
 
 def parse_identifier(query_text: str) -> list[tuple[str, int]]:
     """Extract (metadata field, number) pairs naming a part of the document.
     """
-    found = {}
+    found = []
+    page = None
+
     for word, number in _IDENTIFIER.findall(query_text):
         word = word.lower()
-        for field, aliases in _IDENTIFIER_FIELDS:
-            if word in aliases:
-                found.setdefault(field, int(number))
+        number = int(number)
+        if word == "page":
+            page = number
+            continue
+        
+        found.append((word, number))
+        for fallback in _FALLBACKS.get(word, ()):
+            found.append((fallback, number))
+    if page is not None:
+        found.append(("page", number))
 
-    return [(field, found[field]) for field, _ in _IDENTIFIER_FIELDS if field in found]
-
+    return found
 
 def route_search(query_text: str, source: str | None = None, n: int = 6):
     """Retrieve for a query, picking exact lookup over similarity when possible.

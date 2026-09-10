@@ -54,8 +54,6 @@ def _calculate_confidence_score(relevance_scores: list[float], finding_text: str
     
     return round (evidence * 100)
 
-# Structural fields a chunk may carry; the UI labels each citation with them.
-_LOCATION_KEYS = ("page", "recital", "article", "chapter")
 
 # Ceiling on retrieved passages: beyond this the prompt outgrows the 4096-token
 # context window and the model starts silently dropping the tail.
@@ -70,7 +68,12 @@ def _location(meta: dict) -> dict:
     """
     if not meta:
         return {}
-    where = {key: meta[key] for key in _LOCATION_KEYS if key in meta}
+
+    where = {}
+    for key in meta:
+        if key != "source":
+            where[key] = meta[key]
+
     if "source" in meta:
         where["document"] = meta["source"]
     return where
